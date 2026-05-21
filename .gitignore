@@ -27,3 +27,4 @@ checkpoints/
 
 # Evaluation scratch output
 eval_output/
+__pycache__/
