@@ -3,6 +3,8 @@ numpy
 pandas
 scipy
 scikit-learn
+xgboost>=2.0
+seaborn
 lasio
 matplotlib
 plotly

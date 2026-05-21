@@ -62,10 +62,11 @@ def train(config: dict) -> None:
     )
     print(f"Train windows: {len(train_ds)}  Val windows: {len(val_ds)}")
 
+    nw = config["training"].get("num_workers", 2)
     train_loader = DataLoader(train_ds, batch_size=config["training"]["batch_size"],
-                              shuffle=True, num_workers=4, pin_memory=True)
+                              shuffle=True, num_workers=nw, pin_memory=True)
     val_loader   = DataLoader(val_ds,   batch_size=config["training"]["batch_size"],
-                              shuffle=False, num_workers=4, pin_memory=True)
+                              shuffle=False, num_workers=nw, pin_memory=True)
 
     model = LithologyTransformer(
         n_features=len(feature_cols),
@@ -128,12 +129,14 @@ def train(config: dict) -> None:
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save({"epoch": epoch, "model": model.state_dict(),
-                        "val_loss": val_loss, "feature_cols": feature_cols},
+                        "val_loss": val_loss, "feature_cols": feature_cols,
+                        "val_wells": val_wells, "config": config},
                        ckpt_dir / "best.pt")
             print(f"  Saved best checkpoint (val={val_loss:.4f})")
 
     torch.save({"epoch": epoch, "model": model.state_dict(),
-                "feature_cols": feature_cols}, ckpt_dir / "last.pt")
+                "feature_cols": feature_cols, "val_wells": val_wells,
+                "config": config}, ckpt_dir / "last.pt")
     print(f"\nDone. Best val loss: {best_val_loss:.4f}")
 
 

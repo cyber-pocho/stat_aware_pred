@@ -1,0 +1,21 @@
+data:
+  data_dir: data/force2020
+  add_derived: true
+  add_window_features: true      # rolling mean/std at windows [5, 15, 31] depths
+  val_fraction: 0.15
+  seed: 42                       # same seed as stage1.yaml → identical val wells
+
+model:
+  n_estimators: 500
+  max_depth: 7
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  random_state: 42
+
+training:
+  seed: 42
+  verbose: true
+
+output:
+  checkpoint_dir: checkpoints/baseline

@@ -8,7 +8,7 @@ Built on the [FORCE 2020](https://github.com/bolgebrygg/Force-2021-Machine-Learn
 
 ## Motivation
 
-Standard lithology classifiers treat each depth sample independently. A shale layer sitting above a sandstone is a meaningful stratigraphic relationship — but a per-sample classifier ignores it. Self-attention lets the model learn these inter-depth dependencies directly from data, without manually encoding geological rules.
+Standard lithology classifiers treat each depth sample independently. A shale layer sitting above a sandstone is a meaningful stratigraphic relationship - but a per-sample classifier ignores it. Self-attention lets the model learn these inter-depth dependencies directly from data, without manually encoding geological rules.
 
 A second contribution is uncertainty-aware grade prediction: lithology predictions from Stage 1 condition a cross-attention fusion network that predicts mineral grade at undrilled locations, with calibrated uncertainty estimates from deep ensembles.
 
@@ -50,6 +50,8 @@ Uncertainty is estimated via deep ensembles (5 members) and benchmarked against 
 **Stage 1 — [FORCE 2020](https://www.kaggle.com/datasets/ala2obstantsmachines/force-well-logs)**  
 Norwegian petroleum wells with expert-labeled lithofacies at 0.1524 m intervals.
 
+11 labeled wells · 121,424 depth samples · 10 wells skipped (no labels)
+
 | Curve | Description           | Curve | Description          |
 |-------|-----------------------|-------|----------------------|
 | GR    | Gamma Ray             | DTC   | Compressional Sonic  |
@@ -60,7 +62,23 @@ Norwegian petroleum wells with expert-labeled lithofacies at 0.1524 m intervals.
 
 Four derived features are added: Vp/Vs ratio, neutron-density crossplot, resistivity invasion ratio, and per-well normalised GR.
 
-**Lithology classes (11):** Sandstone · Shale · Shale with sand · Limestone · Limestone with clay · Chalk · Marl · Halite · Anhydrite · Tuff · Coal
+**Lithology classes (11) — class distribution:**
+
+| Class              | Count  | % |
+|--------------------|--------|-----|
+| Shale              | 69,305 | 57.1 |
+| Sandstone          | 14,794 | 12.2 |
+| Shale with sand    | 10,507 |  8.7 |
+| Anhydrite          |  6,498 |  5.4 |
+| Limestone          |  8,721 |  7.2 |
+| Marl               |  5,266 |  4.3 |
+| Limestone w/ clay  |  2,905 |  2.4 |
+| Coal               |  2,366 |  1.9 |
+| Halite             |    597 |  0.5 |
+| Chalk              |    269 |  0.2 |
+| Tuff               |    196 |  0.2 |
+
+Focal loss (γ=2) is used to counter shale dominance (57% of samples).
 
 **Stage 2 — [GSWA Open Drillhole Database](https://dasc.dmp.wa.gov.au/dasc/)**  
 Western Australian public mineral exploration drill holes with Au/Cu/Ni/Zn assay data.
@@ -80,13 +98,15 @@ Download the FORCE 2020 per-well CSVs from Kaggle and place them in `data/force2
 
 **Train:**
 ```bash
-python src/train/stage1.py --config configs/stage1.yaml
+python -m src.train.stage1 --config configs/stage1.yaml
 ```
 
 **Evaluate:**
 ```bash
-python src/eval/run_eval.py --config configs/stage1.yaml --checkpoint checkpoints/stage1/best.pt
+python -m src.eval.run_eval --config configs/stage1.yaml --checkpoint checkpoints/stage1/best.pt
 ```
+
+> **CPU note:** the default config uses `num_workers: 0` — the dataset is fully in-memory so extra workers provide no benefit and can cause issues on some systems.
 
 Key config options in `configs/stage1.yaml`:
 
@@ -134,10 +154,13 @@ stat_aware_pred/
 │   │   └── uncertainty.py
 │   ├── train/
 │   │   ├── stage1.py
-│   │   └── stage2.py
+│   │   ├── stage2.py
+│   │   └── baseline.py  # GBT baseline for comparison
 │   └── eval/
 │       ├── metrics.py
-│       └── visualize.py
+│       ├── visualize.py
+│       ├── run_eval.py
+│       └── compare.py   # Stage 1 vs baseline comparison
 ├── configs/
 │   ├── stage1.yaml
 │   └── stage2.yaml

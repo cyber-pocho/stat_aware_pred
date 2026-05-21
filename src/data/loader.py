@@ -1,3 +1,4 @@
+
 import os
 import pandas as pd
 import numpy as np
@@ -24,12 +25,12 @@ IDX_TO_NAME={i:LITHOLOGY_MAP[code] for code, i in LITHOLOGY_TO_IDX.items()}
 N_CLASSES=len(LITHOLOGY_MAP)
 
 CORE_LOG_CURVES=[
-    "GR", # Gamma Ray
-    "RDEP", # Deep resistivity
-    "RMED", # Medium resistivity
-    "RHOB", # Bulk density
-    "NPHI", # Neutron porosity
-    "DTC", # Compressional Sonic
+    "GR", # Gamma Ray - natural emission of radiation of the rock. 
+    "RDEP", # Deep resistivity - determines if there's crude oil or water. 
+    "RMED", # Medium resistivity - mixture of perforation mud and formation fluid (crude oil or water). 
+    "RHOB", # Bulk density - density of the rock. 
+    "NPHI", # Neutron porosity - Electronic density ~ rock density. 
+    "DTC", # Compressional Sonic - 
     "DTS", # Shear Sonic
     "PEF", # Photoelectric factor
     "CALI", # Caliper
@@ -118,7 +119,7 @@ def load_all_wells(data_dir: str, verbose:bool=True)->pd.DataFrame:
                     f"{IDX_TO_NAME[i]}={n}" for i, n in lith_counts.items()
                     )
             null_pct=df[CORE_LOG_CURVES].isnull().mean().mean()*100
-            print(f"Loaded {f.name:.35s}, {len(df):.6d} rows", f"null={null_pct:.1f}, {lith_str}")
+            print(f"Loaded {f.name:.35s}, {len(df):6d} rows", f"null={null_pct:.1f}, {lith_str}")
         dfs.append(df)
     if verbose: 
         print(f"\nSkipped (no labels): {skipped}")
@@ -144,5 +145,4 @@ def get_well_list(data_dir: str) -> list:
 if __name__=="__main__": 
     df=load_all_wells("data/force2020_full", verbose=True)
     print("Columns: ", df.columns.tolist())
-
 
