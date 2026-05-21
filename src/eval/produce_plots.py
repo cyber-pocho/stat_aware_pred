@@ -20,7 +20,7 @@ import numpy as np
 import torch
 import yaml
 
-plt.style.use(["science", "no-latex"])
+plt.style.use(["science", "ieee"])
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -217,7 +217,7 @@ def save_confusion_matrix(y_true, y_pred):
                           normalize=True, ax=ax)
     fig.tight_layout()
     out = OUTPUT_DIR / "confusion_matrix.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {out}")
 
@@ -226,12 +226,12 @@ def save_calibration_curve(y_true, y_pred, y_conf):
     correct = y_true == y_pred
     ece = expected_calibration_error(y_conf, correct)
     centres, acc, counts = reliability_diagram_data(y_conf, correct)
-    fig, ax = plt.subplots(figsize=(6, 6))
+    fig, ax = plt.subplots(figsize=(5, 5))
     plot_reliability_diagram(centres, acc, counts,
                              label=f"Transformer (ECE={ece:.3f})", ax=ax)
     fig.tight_layout()
     out = OUTPUT_DIR / "calibration_curve.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {out}  ECE={ece:.4f}")
     return ece
@@ -241,8 +241,8 @@ def save_attention_heatmap(attn, depths):
     n = attn.shape[0]
     tick_idx = np.linspace(0, n - 1, min(12, n), dtype=int)
 
-    fig, ax = plt.subplots(figsize=(12, 7))
-    im = ax.imshow(attn, aspect="auto", cmap="YlOrRd", interpolation="nearest")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    im = ax.imshow(attn, aspect="auto", cmap="inferno", interpolation="nearest")
     plt.colorbar(im, ax=ax, label="Attention weight")
     ax.set_xticks(tick_idx)
     ax.set_xticklabels([f"{depths[i]:.0f} m" for i in tick_idx], rotation=45, ha="right")
@@ -250,45 +250,48 @@ def save_attention_heatmap(attn, depths):
     ax.set_yticklabels([f"{depths[i]:.0f} m" for i in tick_idx])
     ax.set_xlabel("Key depth")
     ax.set_ylabel("Query depth")
-    ax.set_title("Layer-1 self-attention weights — val well 31/2-21 S")
+    ax.set_title("Layer-1 self-attention weights -- val well 31/2-21 S")
     fig.tight_layout()
     out = OUTPUT_DIR / "attention_weights.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {out}")
 
 
 def save_macro_f1_per_fold(tf_scores, xgb_scores):
+    # Pull the first two colours from the ieee cycle
+    prop_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    c0, c1 = prop_cycle[0], prop_cycle[1]
+
     n = len(tf_scores)
-    fig, ax = plt.subplots(figsize=(max(7, n * 1.4), 5))
+    fig, ax = plt.subplots(figsize=(max(6, n * 1.2), 4))
     x = np.arange(n)
     w = 0.35
-    b1 = ax.bar(x - w / 2, tf_scores,  w, label="Transformer", color="steelblue")
-    b2 = ax.bar(x + w / 2, xgb_scores, w, label="XGBoost",     color="coral")
+    b1 = ax.bar(x - w / 2, tf_scores,  w, label="Transformer", color=c0)
+    b2 = ax.bar(x + w / 2, xgb_scores, w, label="XGBoost",     color=c1)
 
     for bar in (*b1, *b2):
         v = bar.get_height()
         ax.text(bar.get_x() + bar.get_width() / 2, v + 0.005,
-                f"{v:.3f}", ha="center", va="bottom", fontsize=8)
+                f"{v:.3f}", ha="center", va="bottom", fontsize=6)
 
     tf_mean,  tf_std  = np.mean(tf_scores),  np.std(tf_scores)
     xgb_mean, xgb_std = np.mean(xgb_scores), np.std(xgb_scores)
-    ax.axhline(tf_mean,  ls="--", color="steelblue", alpha=0.7,
-               label=f"TF mean={tf_mean:.3f} ±{tf_std:.3f}")
-    ax.axhline(xgb_mean, ls="--", color="coral",     alpha=0.7,
-               label=f"XGB mean={xgb_mean:.3f} ±{xgb_std:.3f}")
+    ax.axhline(tf_mean,  ls="--", lw=0.9, color=c0,
+               label=f"TF mean $= {tf_mean:.3f} \\pm {tf_std:.3f}$")
+    ax.axhline(xgb_mean, ls="--", lw=0.9, color=c1,
+               label=f"XGB mean $= {xgb_mean:.3f} \\pm {xgb_std:.3f}$")
 
     ax.set_xlabel("Spatial Fold")
     ax.set_ylabel("Macro F1")
-    ax.set_title(f"Macro F1 per Spatial Fold — {CV_EPOCHS}-epoch Transformer vs XGBoost")
+    ax.set_title(f"Macro F1 per Spatial Fold ({CV_EPOCHS}-ep Transformer vs. XGBoost)")
     ax.set_xticks(x)
     ax.set_xticklabels([f"Fold {i + 1}" for i in range(n)])
-    ax.set_ylim(0, min(1.0, max(max(tf_scores), max(xgb_scores)) * 1.15 + 0.05))
-    ax.legend(fontsize=8)
-    ax.grid(axis="y", alpha=0.3)
+    ax.set_ylim(0, min(1.0, max(max(tf_scores), max(xgb_scores)) * 1.18 + 0.05))
+    ax.legend(fontsize=6)
     fig.tight_layout()
     out = OUTPUT_DIR / "macro_f1_per_fold.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {out}")
     return tf_mean, tf_std, xgb_mean, xgb_std
