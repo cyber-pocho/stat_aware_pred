@@ -43,6 +43,8 @@ Spatial branch: collar (x,y,z) + surface geophysics → MLP → [batch, d]
 
 Uncertainty is estimated via deep ensembles (5 members) and benchmarked against kriging variance.
 
+STILL PENDING!
+
 ---
 
 ## Dataset
