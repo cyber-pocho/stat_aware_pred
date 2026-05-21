@@ -14,10 +14,13 @@ from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
+import scienceplots  # noqa: F401 — registers styles as a side-effect
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import yaml
+
+plt.style.use(["science", "no-latex"])
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
