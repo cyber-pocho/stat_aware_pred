@@ -1,0 +1,26 @@
+data:
+  data_dir: data/force2020
+  feature_cols: null          # null → use CORE_LOG_CURVES from loader.py
+  add_derived: true           # append VP_VS_RATIO, ND_XPLOT, RD_RM_RATIO, GR_NORM
+  window_size: 128
+  stride: 64
+  val_fraction: 0.15          # fraction of wells held out for validation
+
+model:
+  d_model: 128
+  n_heads: 4
+  n_layers: 4
+  dim_feedforward: 256
+  dropout: 0.1
+
+training:
+  epochs: 50
+  batch_size: 64
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  focal_loss_gamma: 2.0       # 0 → standard cross-entropy
+  seed: 42
+
+output:
+  checkpoint_dir: checkpoints/stage1
+  log_every: 10               # log metrics every N batches

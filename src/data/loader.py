@@ -10,9 +10,12 @@ LITHOLOGY_MAP={
     65030:"Shale with sand",
     70000:"Limestone",
     70032:"Limestone with clay",
-    80000:"Chalk",
-    90000:"Halite",
-    90000:"Anhydrite",
+    74000:"Chalk",
+    80000:"Marl",
+    86000:"Halite",
+    88000:"Anhydrite",
+    90000:"Tuff",
+    99000:"Coal",
 }
 
 LITHOLOGY_TO_IDX={code: i for i, code in enumerate(sorted(LITHOLOGY_MAP.keys()))}
@@ -73,7 +76,7 @@ def load_single_well(filepath:str)-> Optional[pd.DataFrame]:
     if "FORCE_2020_LITHOFACIES_LITHOLOGY" not in df.columns:
         return None
     fname=Path(filepath).name 
-    if name in {"31_6-5.csv", "31_6-8.csv"}: 
+    if fname in {"31_6-5.csv", "31_6-8.csv"}:
         df=_normalize_anomalous(df, filepath)
     keep=META_COLS+SPATIAL_COLS+CORE_LOG_CURVES+LABEL_COLS
     keep=[c for c in keep if c in df.columns]

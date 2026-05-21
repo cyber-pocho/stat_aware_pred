@@ -1,0 +1,30 @@
+data:
+  data_dir: data/gswa
+  stage1_checkpoint: checkpoints/stage1/best.pt
+  n_spatial_features: 7       # x, y, z + 4 surface geophysical channels
+  n_assay_elements: 4         # Au, Cu, Ni, Zn
+  window_size: 64
+  stride: 32
+  n_spatial_folds: 5          # spatial k-fold cross-validation
+
+model:
+  d_model: 128
+  n_heads: 4
+  n_depth_layers: 2
+  dropout: 0.1
+
+training:
+  epochs: 100
+  batch_size: 32
+  lr: 5.0e-4
+  weight_decay: 1.0e-4
+  seed: 42
+
+uncertainty:
+  method: ensemble            # ensemble | mc_dropout
+  n_ensemble_members: 5
+  mc_dropout_samples: 50      # used only when method=mc_dropout
+
+output:
+  checkpoint_dir: checkpoints/stage2
+  log_every: 10

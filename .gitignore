@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data (large files — download scripts provided)
+data/force2020/
+data/gswa/
+
+# Model checkpoints
+checkpoints/
+
+# IDE
+.vscode/
+.idea/
