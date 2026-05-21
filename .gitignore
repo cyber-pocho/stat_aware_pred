@@ -24,3 +24,6 @@ checkpoints/
 # IDE
 .vscode/
 .idea/
+
+# Evaluation scratch output
+eval_output/

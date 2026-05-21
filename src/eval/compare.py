@@ -16,8 +16,13 @@ import argparse
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 import yaml
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from src.data.loader import load_all_wells, N_CLASSES, IDX_TO_NAME, CORE_LOG_CURVES
 from src.data.features import add_derived_features, DERIVED_FEATURES
@@ -27,8 +32,6 @@ from src.eval.visualize import plot_comparison_confusion_matrices
 from src.models.baseline import XGBoostLithologyClassifier, build_window_features
 from src.models.transformer import LithologyTransformer
 
-import matplotlib.pyplot as plt
-
 
 def _transformer_predictions(
     df: pd.DataFrame,
@@ -37,12 +40,12 @@ def _transformer_predictions(
     device: torch.device,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Returns (y_true, y_pred) from the Transformer on the val wells in the checkpoint."""
-    import pandas as pd
 
-    ckpt = torch.load(ckpt_path, map_location=device)
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     feature_cols = ckpt["feature_cols"]
     val_wells    = ckpt.get("val_wells")
     model_cfg    = ckpt.get("config", config)["model"]
+    train_stats  = ckpt.get("train_stats")
 
     eval_df = df[df["WELL"].isin(val_wells)] if val_wells else df
 
@@ -56,7 +59,7 @@ def _transformer_predictions(
 
     ds = WellLogDataset(eval_df, feature_cols=feature_cols,
                         window_size=config["data"]["window_size"],
-                        stride=config["data"]["window_size"], stats=None)
+                        stride=config["data"]["window_size"], stats=train_stats)
     loader = torch.utils.data.DataLoader(ds, batch_size=128, shuffle=False, num_workers=2)
 
     true_list, pred_list = [], []
@@ -101,7 +104,6 @@ def compare(
     xgb_ckpt: str,
     output_dir: str = "eval_output",
 ) -> None:
-    import pandas as pd
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     output_dir = Path(output_dir)
@@ -115,7 +117,7 @@ def compare(
     y_true, y_pred_tf = _transformer_predictions(df, transformer_ckpt, config, device)
 
     # Recover val_wells from transformer checkpoint to use the same split for XGBoost
-    ckpt = torch.load(transformer_ckpt, map_location="cpu")
+    ckpt = torch.load(transformer_ckpt, map_location="cpu", weights_only=False)
     val_wells = ckpt.get("val_wells", sorted(df["WELL"].unique().tolist()))
 
     y_pred_xgb = _xgb_predictions(df, xgb_ckpt, config, val_wells)
@@ -154,16 +156,16 @@ def compare(
         normalize=True,
         save_path=save_path,
     )
-    plt.show()
+    plt.close("all")
 
 
 if __name__ == "__main__":
-    import pandas as pd
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--config",      required=True)
-    parser.add_argument("--transformer", required=True, help="Path to Stage 1 best.pt")
-    parser.add_argument("--xgboost",     required=True, help="Path to xgboost.pkl")
+    parser.add_argument("--transformer", default="checkpoints/stage1/best.pt",
+                        help="Path to Stage 1 best.pt")
+    parser.add_argument("--xgboost",     default="checkpoints/stage1/xgboost.pkl",
+                        help="Path to xgboost.pkl")
     parser.add_argument("--output-dir",  default="eval_output")
     args = parser.parse_args()
 

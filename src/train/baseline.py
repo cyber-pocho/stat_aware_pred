@@ -43,7 +43,7 @@ def train(config: dict) -> None:
     val_df   = df[df["WELL"].isin(val_wells)]
     print(f"Train rows: {len(train_df):,}  Val rows: {len(val_df):,}")
 
-    clf = XGBoostLithologyClassifier(**config["model"])
+    clf = XGBoostLithologyClassifier(**config.get("baseline_model", {}))
     clf.fit(train_df, val_df, feature_cols,
             verbose=config["training"].get("verbose", True))
 

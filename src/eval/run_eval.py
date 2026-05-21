@@ -16,6 +16,8 @@ from src.eval.metrics import macro_f1, per_class_f1, expected_calibration_error,
 from src.eval.visualize import plot_confusion_matrix, plot_reliability_diagram
 from src.models.transformer import LithologyTransformer
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
@@ -25,10 +27,11 @@ def run_eval(config: dict, checkpoint_path: str, output_dir: str = "eval_output"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load checkpoint
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     feature_cols = ckpt["feature_cols"]
     val_wells    = ckpt.get("val_wells")
     model_cfg    = ckpt.get("config", config)["model"]
+    train_stats  = ckpt.get("train_stats")
 
     print(f"Checkpoint: epoch {ckpt['epoch']}  val_loss={ckpt.get('val_loss', '?'):.4f}")
     if val_wells:
@@ -54,13 +57,13 @@ def run_eval(config: dict, checkpoint_path: str, output_dir: str = "eval_output"
     model.load_state_dict(ckpt["model"])
     model.eval()
 
-    # Build dataset (no augmentation / shuffling)
+    # Build dataset using training normalization stats so inputs match training distribution
     ds = WellLogDataset(
         eval_df,
         feature_cols=feature_cols,
         window_size=config["data"]["window_size"],
         stride=config["data"]["window_size"],   # non-overlapping for eval
-        stats=None,
+        stats=train_stats,
     )
     loader = torch.utils.data.DataLoader(ds, batch_size=128, shuffle=False, num_workers=2)
 
@@ -117,7 +120,7 @@ def run_eval(config: dict, checkpoint_path: str, output_dir: str = "eval_output"
     out_path = output_dir / "eval_transformer.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     print(f"\nSaved figures → {out_path}")
-    plt.show()
+    plt.close("all")
 
 
 if __name__ == "__main__":

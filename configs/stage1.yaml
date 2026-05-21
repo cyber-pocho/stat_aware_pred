@@ -25,3 +25,11 @@ training:
 output:
   checkpoint_dir: checkpoints/stage1
   log_every: 10               # log metrics every N batches
+
+baseline_model:
+  n_estimators: 500
+  max_depth: 7
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  random_state: 42

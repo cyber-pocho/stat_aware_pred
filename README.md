@@ -124,6 +124,48 @@ training:
 
 ---
 
+## Results
+
+### Stage 1 — Lithology Classifier
+
+Evaluated on spatially isolated held-out wells (spatial k-fold, k=5). The Transformer operates on full depth sequences via self-attention; the XGBoost baseline receives rolling-window context features (windows of 5, 15, 31 depth samples) for a fair comparison.
+
+**Single held-out well (best checkpoint, 50 epochs)**
+
+| Model       | Macro F1 | Sandstone | Shale | Shale/Sand | Limestone |
+|-------------|----------|-----------|-------|------------|-----------|
+| Transformer | 0.4149   | 0.721     | 0.820 | 0.355      | 0.594     |
+| XGBoost     | 0.5157   | 0.713     | 0.870 | 0.190      | 0.615     |
+
+The Transformer leads on Shale with sand (+0.165), a transitional facies where stratigraphic context helps. XGBoost leads on rare classes (Tuff, Coal) where self-attention overfits on limited examples.
+
+**5-fold spatial cross-validation (15 epochs/fold)**
+
+| Model       | Macro F1 mean | Macro F1 std |
+|-------------|---------------|--------------|
+| Transformer | **0.2660**    | ±0.061       |
+| XGBoost     | 0.2522        | ±0.109       |
+
+The Transformer is more stable across folds (lower std), suggesting better generalisation to unseen spatial regions. Both models struggle on folds 1 and 4 where the two geochemically-distinct well clusters (Halite/Anhydrite evaporite facies) are held out.
+
+**Confusion matrix — val well 31/2-21 S (Transformer):**
+
+![Confusion Matrix](notebooks/results/confusion_matrix.png)
+
+**Macro F1 per spatial fold:**
+
+![F1 per fold](notebooks/results/macro_f1_per_fold.png)
+
+**Layer-1 self-attention weights:**
+
+![Attention weights](notebooks/results/attention_weights.png)
+
+**Reliability diagram (ECE = 0.080):**
+
+![Calibration](notebooks/results/calibration_curve.png)
+
+---
+
 ## Evaluation
 
 Stage 1 is evaluated against the FORCE 2020 Kaggle winning solution (gradient-boosted trees) using macro F1 across all 11 classes. Held-out wells are spatially isolated from training wells — random splits are optimistic in spatial problems because nearby wells are correlated.
