@@ -1,0 +1,449 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+
+% ── packages ──────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath, amssymb, mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+
+% ── minimal theme ─────────────────────────────────────────
+\usetheme{default}
+\usecolortheme{default}
+\beamertemplatenavigationsymbolsempty
+
+% ── colour palette ────────────────────────────────────────
+\definecolor{Accent}{HTML}{B45309}     % deep amber for emphasis
+\definecolor{Muted}{HTML}{6B7280}      % muted grey
+\definecolor{Rule}{HTML}{D1D5DB}       % thin rule grey
+
+\setbeamercolor{frametitle}{fg=black, bg=white}
+\setbeamercolor{title}{fg=black}
+\setbeamercolor{subtitle}{fg=Muted}
+\setbeamercolor{normal text}{fg=black, bg=white}
+\setbeamercolor{structure}{fg=Accent}
+\setbeamercolor{itemize item}{fg=Accent}
+\setbeamercolor{itemize subitem}{fg=Muted}
+\setbeamercolor{section in toc}{fg=black}
+\setbeamercolor{block title}{fg=black, bg=white}
+\setbeamercolor{block body}{fg=black, bg=white}
+
+% Remove default block borders/fills
+\setbeamertemplate{blocks}[default]
+\setbeamertemplate{itemize item}{\textbullet}
+\setbeamertemplate{itemize subitem}{--}
+
+% Minimal frame title with thin rule
+\setbeamertemplate{frametitle}{%
+  \vspace*{0.6em}%
+  \hspace*{0.4em}{\large\textbf{\insertframetitle}}\\[-0.2em]
+  \hspace*{0.4em}{\color{Rule}\rule{0.95\paperwidth}{0.4pt}}%
+  \vspace*{0.4em}%
+}
+
+% Footline: page number only, lower right
+\setbeamertemplate{footline}{%
+  \hfill{\tiny\color{Muted}\insertframenumber\,/\,\inserttotalframenumber}%
+  \hspace*{1em}\vspace*{0.4em}%
+}
+
+% Math colour
+\everymath{\color{black}}
+
+% ── convenience macros ────────────────────────────────────
+\newcommand{\acc}[1]{{\color{Accent}#1}}
+\newcommand{\mut}[1]{{\color{Muted}#1}}
+\newcommand{\T}{\mathsf{T}}
+\newcommand{\dmodel}{d_{\mathrm{model}}}
+\newcommand{\dkey}{d_k}
+\newcommand{\softmax}{\operatorname{softmax}}
+\newcommand{\Concat}{\operatorname{Concat}}
+\newcommand{\LayerNorm}{\operatorname{LayerNorm}}
+
+% ── metadata ──────────────────────────────────────────────
+\title{Stratigraphic-Aware Lithology Classification}
+\subtitle{and Uncertainty-Aware Grade Prediction}
+\author{Julián D. Alfonso-Gómez}
+\institute{Mineflow — Technical Interview}
+\date{May 2026}
+
+\begin{document}
+
+% ── Title ─────────────────────────────────────────────────
+{\setbeamertemplate{footline}{}
+\begin{frame}[plain]
+  \vfill
+  {\Large\textbf{Stratigraphic-Aware Lithology Classification}}\\[0.4em]
+  {\large and Uncertainty-Aware Grade Prediction}\\[1.5em]
+  {\color{Rule}\rule{0.6\textwidth}{0.4pt}}\\[1em]
+  Julián D. Alfonso-Gómez\\[0.3em]
+  \mut{Mineflow — Technical Interview \quad·\quad May 2026}\\[2em]
+  \mut{\footnotesize FORCE 2020 (Norwegian well log benchmark) \quad·\quad PyTorch \quad·\quad XGBoost baseline}
+  \vfill
+\end{frame}}
+
+% ── Problem ───────────────────────────────────────────────
+\begin{frame}{The Problem with Per-Sample Classifiers}
+  Standard lithology models classify each depth sample \textbf{independently}:
+  \[
+    \hat{y}_t = f\!\left(\mathbf{x}_t\right), \quad t = 1, \ldots, L
+  \]
+
+  \vspace{0.8em}
+  \acc{What they miss:} a shale layer sitting \emph{above} a sandstone is a stratigraphic relationship — geological signal encoded in depth ordering, not in any single sample.
+
+  \vspace{1em}
+  \textbf{Our approach.} Replace the pointwise classifier with a Transformer encoder that attends across the entire depth sequence:
+  \[
+    \hat{\mathbf{Y}} = \mathrm{TransEnc}\!\left(\mathbf{X}, \mathbf{d}\right) \in \mathbb{R}^{L \times C}
+  \]
+  where $\mathbf{d}\in\mathbb{R}^L$ are \acc{actual measured depths in metres} and $C=11$ lithology classes.
+\end{frame}
+
+% ── Dataset ───────────────────────────────────────────────
+\begin{frame}{FORCE 2020 — Norwegian Well Log Benchmark}
+  \textbf{Scale.} 11 labeled wells $\cdot$ \acc{121,424} depth samples at 0.1524 m intervals.
+
+  \vspace{0.8em}
+  \textbf{Input log curves} ($n_f = 14$):
+
+  \vspace{0.4em}
+  \begin{footnotesize}
+  \begin{tabular}{ll@{\hspace{2em}}ll}
+    \toprule
+    \textbf{Curve} & \textbf{Signal} & \textbf{Curve} & \textbf{Signal}\\
+    \midrule
+    GR   & Gamma Ray       & DTC  & Compressional $\Delta t$\\
+    RDEP & Deep Resistivity & DTS  & Shear $\Delta t$\\
+    RMED & Medium Resistivity & PEF  & Photoelectric\\
+    RHOB & Bulk Density    & CALI & Caliper\\
+    NPHI & Neutron Porosity & DRHO & Density Correction\\
+    \bottomrule
+  \end{tabular}
+  \end{footnotesize}
+
+  \vspace{0.8em}
+  \mut{Plus 4 derived features: $V_p/V_s$, neutron-density crossplot, $R_\text{dep}/R_\text{med}$, per-well normalised GR.}
+\end{frame}
+
+% ── Class distribution ───────────────────────────────────
+\begin{frame}{Class Distribution — Severe Imbalance}
+  \begin{footnotesize}
+  \begin{tabular}{l r r}
+    \toprule
+    \textbf{Class} & \textbf{Count} & \textbf{\%}\\
+    \midrule
+    Shale              & 69,305 & 57.1\\
+    Sandstone          & 14,794 & 12.2\\
+    Shale with sand    & 10,507 &  8.7\\
+    Limestone          &  8,721 &  7.2\\
+    Anhydrite          &  6,498 &  5.4\\
+    Marl               &  5,266 &  4.3\\
+    Limestone w/ clay  &  2,905 &  2.4\\
+    Coal               &  2,366 &  1.9\\
+    Halite             &    597 &  0.5\\
+    Chalk              &    269 &  0.2\\
+    Tuff               &    196 &  0.2\\
+    \bottomrule
+  \end{tabular}
+  \end{footnotesize}
+
+  \vspace{1em}
+  \acc{Shale alone is 57\% of samples.} A trivial classifier predicting only shale gets 57\% accuracy but Macro F1 $\approx 0.09$ — this is why we use focal loss.
+\end{frame}
+
+% ── Architecture overview ─────────────────────────────────
+\begin{frame}{Stage 1 — Transformer Architecture}
+  \begin{footnotesize}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Step} & \textbf{Operation}\\
+    \midrule
+    Input         & $\mathbf{X} \in \mathbb{R}^{B \times L \times n_f}$ — well log curves\\
+    Projection    & Linear $\mathbb{R}^{n_f} \to \mathbb{R}^{\dmodel}$, $\dmodel=128$\\
+    Positional encoding & Depth-aware sinusoidal, added to projection\\
+    Encoder       & $N=4$ Transformer layers, $H=4$ heads, $d_\text{ff}=256$\\
+    Head          & Linear $\mathbb{R}^{\dmodel} \to \mathbb{R}^C$\\
+    Output        & $\hat{\mathbf{Y}} \in \mathbb{R}^{B \times L \times 11}$ — per-interval logits\\
+    \bottomrule
+  \end{tabular}
+  \end{footnotesize}
+
+  \vspace{1em}
+  \mut{Sliding window: $L=128$ depth samples ($\approx 19.5$ m), stride $= 64$, batch $B=64$.}
+\end{frame}
+
+% ── Positional encoding ──────────────────────────────────
+\begin{frame}{Depth-Aware Positional Encoding}
+  Standard Transformers encode \emph{sequence position} $t$. We encode \acc{actual measured depth $d_t$ in metres}, so a 10 m interval at 500 m differs from one at 2,000 m:
+
+  \vspace{0.6em}
+  \[
+    \text{PE}(d_t, 2i) = \sin\!\left(d_t \cdot \omega_i\right), \quad
+    \text{PE}(d_t, 2i+1) = \cos\!\left(d_t \cdot \omega_i\right)
+  \]
+  \[
+    \omega_i = \exp\!\left(-\frac{2i}{\dmodel} \ln D_{\max}\right), \quad D_{\max} = 6000\;\text{m}
+  \]
+
+  \vspace{0.6em}
+  The encoded token at position $t$:
+  \[
+    \tilde{\mathbf{x}}_t = \underbrace{W_\text{in} \mathbf{x}_t}_{\text{log projection}} + \underbrace{\text{PE}(d_t)}_{\text{depth info}} \in \mathbb{R}^{\dmodel}
+  \]
+
+  \vspace{0.4em}
+  \mut{Absolute depth matters geologically: evaporites at $>3$ km, shallow clastics at $<1$ km. Irregular sampling is handled naturally.}
+\end{frame}
+
+% ── Scaled dot-product attention ─────────────────────────
+\begin{frame}{Scaled Dot-Product Attention}
+  Given $\tilde{\mathbf{X}} \in \mathbb{R}^{L \times \dmodel}$, project to queries, keys, values:
+  \[
+    \mathbf{Q} = \tilde{\mathbf{X}} W^Q, \quad
+    \mathbf{K} = \tilde{\mathbf{X}} W^K, \quad
+    \mathbf{V} = \tilde{\mathbf{X}} W^V
+  \]
+
+  \vspace{0.4em}
+  \[
+    \mathrm{Attn}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \softmax\!\left(\frac{\mathbf{Q} \mathbf{K}^{\T}}{\sqrt{\dkey}}\right) \mathbf{V} \in \mathbb{R}^{L \times \dkey}
+  \]
+
+  \vspace{0.8em}
+  The attention matrix $\mathbf{A} = \softmax(\mathbf{Q}\mathbf{K}^{\T}/\sqrt{\dkey}) \in [0,1]^{L \times L}$ encodes \textbf{how much depth interval $t$ attends to interval $s$}. Each row sums to 1.
+
+  \vspace{0.6em}
+  \mut{Scaling by $1/\!\sqrt{\dkey}$ keeps dot product variance at unity, preventing softmax saturation and vanishing gradients.}
+\end{frame}
+
+% ── Multi-head attention ─────────────────────────────────
+\begin{frame}{Multi-Head Attention}
+  $H$ heads run in parallel, each with its own projections $W^Q_h, W^K_h, W^V_h \in \mathbb{R}^{\dmodel \times \dkey}$ where $\dkey = \dmodel / H$:
+
+  \[
+    \mathrm{head}_h = \mathrm{Attn}(\tilde{\mathbf{X}} W^Q_h, \tilde{\mathbf{X}} W^K_h, \tilde{\mathbf{X}} W^V_h)
+  \]
+  \[
+    \mathrm{MHA}(\tilde{\mathbf{X}}) = \Concat(\mathrm{head}_1, \ldots, \mathrm{head}_H) W^O, \quad H=4, \dkey=32
+  \]
+
+  \vspace{0.6em}
+  Each encoder layer wraps MHA in a residual block:
+  \[
+    \mathbf{Z} = \LayerNorm(\tilde{\mathbf{X}} + \mathrm{MHA}(\tilde{\mathbf{X}}))
+  \]
+  \[
+    \mathbf{Z}' = \LayerNorm(\mathbf{Z} + \mathrm{FFN}(\mathbf{Z}))
+  \]
+
+  \vspace{0.6em}
+  \mut{Different heads specialise in different stratigraphic relationships simultaneously — one head may capture resistivity patterns, another density-porosity relationships.}
+\end{frame}
+
+% ── Focal loss ───────────────────────────────────────────
+\begin{frame}{Focal Loss for Class Imbalance}
+  Standard cross-entropy for a sample with true class $c$:
+  \[
+    \mathcal{L}_{\text{CE}} = -\log \hat{p}_c
+  \]
+
+  \vspace{0.4em}
+  \acc{Problem:} shale is 57\% of samples. A model that always predicts shale gets $\mathcal{L}_{\text{CE}} \approx 0.56$ — low enough that gradient descent stalls before learning minority classes.
+
+  \vspace{0.8em}
+  \textbf{Focal loss} adds a modulating factor $(1 - \hat{p}_c)^\gamma$:
+  \[
+    \mathcal{L}_{\text{FL}} = -(1 - \hat{p}_c)^\gamma \log \hat{p}_c, \quad \gamma = 2
+  \]
+
+  \vspace{0.4em}
+  Easy correct predictions ($\hat{p}_c = 0.95$): factor $= 0.0025$, near zero contribution. Hard or wrong predictions ($\hat{p}_c = 0.1$): factor $= 0.81$, dominates the gradient.
+
+  \vspace{0.6em}
+  \mut{Automatic curriculum learning — the model focuses capacity on what it doesn't yet know.}
+\end{frame}
+
+% ── Spatial CV ───────────────────────────────────────────
+\begin{frame}{Spatial Cross-Validation}
+  Random row-level splits are \acc{catastrophically optimistic} for well log data:
+
+  \vspace{0.4em}
+  \begin{itemize}
+    \item \textbf{Autocorrelation:} rock at 1500.00 m is nearly identical to rock at 1499.85 m. If one is in train and the other in test, the model memorises rather than generalises.
+    \item \textbf{Spatial correlation:} nearby wells share basin geology. Splitting nearby wells across folds inflates apparent performance.
+  \end{itemize}
+
+  \vspace{0.6em}
+  \textbf{Our protocol.} Cluster wells by surface coordinates $(X_\text{LOC}, Y_\text{LOC})$ via $k$-means. Hold out entire clusters as folds. The model has \emph{never seen} the held-out geographic region during training.
+
+  \vspace{0.6em}
+  \mut{Harder evaluation, but it answers the question that matters in deployment: can the model predict lithology in geology it has never seen?}
+\end{frame}
+
+% ── Stage 1 results ──────────────────────────────────────
+\begin{frame}{Stage 1 Results — Single Held-Out Well}
+  Best checkpoint, 50 epochs, validation well 31/2-21 S:
+
+  \vspace{0.6em}
+  \begin{footnotesize}
+  \begin{tabular}{l r r r r r}
+    \toprule
+    \textbf{Model} & \textbf{Macro F1} & \textbf{Sandstone} & \textbf{Shale} & \textbf{Shale/Sand} & \textbf{Limestone}\\
+    \midrule
+    Transformer & 0.4149 & 0.721 & 0.820 & \acc{0.355} & 0.594\\
+    XGBoost     & 0.5157 & 0.713 & 0.870 & 0.190        & 0.615\\
+    \bottomrule
+  \end{tabular}
+  \end{footnotesize}
+
+  \vspace{1em}
+  \acc{Transformer wins on transitional facies} (Shale with sand, $+0.165$ F1) — context-dependent classes where stratigraphic sequence matters most. This is the architectural thesis validated.
+
+  \vspace{0.4em}
+  \mut{XGBoost leads on ultra-rare classes (Tuff, Coal) where the Transformer overfits on a handful of examples.}
+\end{frame}
+
+% ── Spatial CV results ───────────────────────────────────
+\begin{frame}{Stage 1 Results — 5-Fold Spatial CV}
+  15 epochs per fold, geographically isolated held-out wells:
+
+  \vspace{0.8em}
+  \begin{footnotesize}
+  \begin{tabular}{l r r}
+    \toprule
+    \textbf{Model} & \textbf{Macro F1 (mean)} & \textbf{Macro F1 (std)}\\
+    \midrule
+    Transformer & \textbf{0.2660} & \acc{$\pm$0.061}\\
+    XGBoost     & 0.2522          & $\pm$0.109\\
+    \bottomrule
+  \end{tabular}
+  \end{footnotesize}
+
+  \vspace{1em}
+  \acc{Half the variance across folds.} The Transformer is more consistent across unseen geological environments — exactly what matters when deploying to new mine sites.
+
+  \vspace{0.6em}
+  Calibration: \textbf{ECE $= 0.080$}. The model's confidence estimates are reasonably trustworthy, which makes them usable as soft conditioning signals for downstream prediction.
+\end{frame}
+
+% ── Stage 2 architecture ─────────────────────────────────
+\begin{frame}{Stage 2 — Cross-Attention Grade Predictor}
+  \begin{footnotesize}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Branch} & \textbf{Inputs and operations}\\
+    \midrule
+    Depth branch   & Assay values + Stage 1 lithology probabilities\\
+                   & $\to$ Transformer encoder $\to$ $\mathbf{Z}_d \in \mathbb{R}^{L \times \dmodel}$\\
+    \addlinespace
+    Spatial branch & Collar $(x, y, z)$ + surface geophysics\\
+                   & $\to$ MLP $\to$ $\mathbf{z}_s \in \mathbb{R}^{\dmodel}$\\
+    \addlinespace
+    Fusion         & Cross-attention: $\mathbf{z}_s$ queries $\mathbf{Z}_d$\\
+    Output         & Regression head $\to$ grade $\hat{g}$ + uncertainty\\
+    \bottomrule
+  \end{tabular}
+  \end{footnotesize}
+
+  \vspace{1em}
+  \acc{The spatial context queries the depth sequence} — the model asks \emph{which stratigraphic intervals are most predictive of grade at this surface location?}
+\end{frame}
+
+% ── Cross-attention math ─────────────────────────────────
+\begin{frame}{Cross-Attention Fusion — Mathematics}
+  The spatial context vector queries the depth sequence:
+  \[
+    \mathbf{Q}_s = \mathbf{z}_s W^Q_s \in \mathbb{R}^{1 \times \dmodel}
+  \]
+  \[
+    \mathbf{K}_d = \mathbf{Z}_d W^K_d, \quad \mathbf{V}_d = \mathbf{Z}_d W^V_d \in \mathbb{R}^{L \times \dmodel}
+  \]
+
+  \vspace{0.4em}
+  \[
+    \alpha_\ell = \frac{\exp(\mathbf{Q}_s \mathbf{k}_\ell^{\T} / \sqrt{\dkey})}{\sum_{\ell'} \exp(\mathbf{Q}_s \mathbf{k}_{\ell'}^{\T} / \sqrt{\dkey})}, \quad
+    \mathbf{f} = \sum_{\ell=1}^{L} \alpha_\ell \mathbf{v}_\ell \in \mathbb{R}^{\dmodel}
+  \]
+
+  \vspace{0.6em}
+  \[
+    \hat{g} = \mathrm{RegressionHead}(\mathbf{f})
+  \]
+
+  \vspace{0.8em}
+  \acc{Geological interpretation.} $\boldsymbol{\alpha} \in [0,1]^L$ is a depth-importance profile — the weights are directly interpretable by geologists. Cross-attention learns that mineralised alteration halos at specific depths matter more than simple concatenation could express.
+\end{frame}
+
+% ── Uncertainty ──────────────────────────────────────────
+\begin{frame}{Uncertainty via Deep Ensembles}
+  Grade prediction in mineral exploration is \acc{high-stakes}: uncertainty quantification is as important as the point estimate.
+
+  \vspace{0.6em}
+  Train $M = 5$ independent models with different random seeds:
+  \[
+    \bar{g} = \frac{1}{M} \sum_{m=1}^{M} \hat{g}^{(m)}, \quad
+    \sigma^2_\text{ens} = \frac{1}{M} \sum_{m=1}^{M} \left(\hat{g}^{(m)} - \bar{g}\right)^2
+  \]
+
+  \vspace{0.6em}
+  Benchmarked against ordinary kriging variance:
+  \[
+    \sigma^2_\text{OK}(\mathbf{x}_0) = C(0) - \boldsymbol{\lambda}^{\T} \mathbf{c}_0
+  \]
+
+  \vspace{0.6em}
+  \mut{Lakshminarayanan et al.\ (2017) show ensembles outperform MC Dropout in calibration, especially in low-data regimes typical of mineral exploration.}
+\end{frame}
+
+% ── Summary ──────────────────────────────────────────────
+\begin{frame}{Summary}
+  \textbf{Contributions}
+  \begin{itemize}
+    \item Depth-sequence Transformer with self-attention over \emph{actual measured depths}, not sequence indices.
+    \item \acc{$+0.165$ F1} on transitional facies (Shale with sand) vs XGBoost.
+    \item \acc{$\sigma_\text{fold} = 0.061$} vs XGBoost's $0.109$ — more spatially stable.
+    \item Stage 2 cross-attention gives interpretable depth-importance weights for grade prediction.
+    \item ECE $= 0.080$ — calibrated probabilities suitable as soft conditioning signals.
+  \end{itemize}
+
+  \vspace{0.8em}
+  \textbf{Next steps}
+  \begin{itemize}
+    \item Train Stage 2 on GSWA Western Australian drill database (Au, Cu, Ni, Zn).
+    \item Pre-train on all 21 FORCE wells via masked-depth modelling (semi-supervised).
+    \item Active learning loop using $\sigma^2_\text{ens}$ to recommend next drill location.
+  \end{itemize}
+\end{frame}
+
+% ── Thank you ────────────────────────────────────────────
+{\setbeamertemplate{footline}{}
+\begin{frame}[plain]
+  \vfill
+  \begin{center}
+    {\Large\acc{\textbf{Thank you}}}\\[1em]
+    \mut{github.com/cyber-pocho/stat\_aware\_pred}
+  \end{center}
+  \vfill
+\end{frame}}
+
+% ── References ───────────────────────────────────────────
+\begin{frame}{References}
+  \begin{footnotesize}
+  \setlength{\parskip}{0.5em}
+
+  Vaswani et al.\ (2017). \emph{Attention Is All You Need.} NeurIPS.
+
+  Lin et al.\ (2017). \emph{Focal Loss for Dense Object Detection.} ICCV.
+
+  Lakshminarayanan et al.\ (2017). \emph{Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles.} NeurIPS.
+
+  Bormann et al.\ (2020). \emph{FORCE Machine Learning Competition: Well Log and Lithofacies Dataset.} Zenodo.
+
+  Geological Survey of WA (2024). \emph{GSWA Open Drillhole Database.}
+  \end{footnotesize}
+\end{frame}
+
+\end{document}
